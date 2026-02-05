@@ -4,9 +4,20 @@ import { Newspaper, Cloud, Lightbulb, TrendingUp } from 'lucide-react';
 import { NEWS_ITEMS } from '../utils/constants';
 import { fetchNews } from '../services/api';
 
+interface NewsItem {
+  id: string;
+  category: string;
+  title: string;
+  description: string;
+  date: string;
+  source: string;
+  type: 'info' | 'warning' | 'alert';
+  articleUrl?: string;
+}
+
 const NewsAlerts: React.FC = () => {
   const { t } = useTranslation();
-  const [news, setNews] = useState<any[]>([]);
+  const [news, setNews] = useState<NewsItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [loading, setLoading] = useState(true);
 
@@ -19,7 +30,7 @@ const NewsAlerts: React.FC = () => {
     try {
       const result = await fetchNews();
       if (result.success) {
-        setNews(result.data || NEWS_ITEMS);
+        setNews((result.data as NewsItem[]) || NEWS_ITEMS);
       }
     } finally {
       setLoading(false);
@@ -135,7 +146,14 @@ const NewsAlerts: React.FC = () => {
                     <p className="font-medium">{item.source}</p>
                     <p>{new Date(item.date).toLocaleDateString()}</p>
                   </div>
-                  <button className="text-primary-600 font-medium hover:text-primary-700 text-sm">
+                  <button
+                    onClick={() => {
+                      if (item.articleUrl) {
+                        window.open(item.articleUrl, '_blank');
+                      }
+                    }}
+                    className="text-primary-600 font-medium hover:text-primary-700 text-sm hover:underline"
+                  >
                     {t('news.readMore')} →
                   </button>
                 </div>

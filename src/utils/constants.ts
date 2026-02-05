@@ -139,7 +139,8 @@ export const NEWS_ITEMS = [
     description: 'Government increases support for small farmers under PM Kisan scheme',
     date: new Date().toISOString(),
     source: 'Agricultural Ministry',
-    type: 'info'
+    type: 'info',
+    articleUrl: 'https://pmkisan.gov.in'
   },
   {
     id: 'news-2',
@@ -148,7 +149,8 @@ export const NEWS_ITEMS = [
     description: 'Meteorological Department warns of heavy rainfall in agricultural regions',
     date: new Date().toISOString(),
     source: 'IMD',
-    type: 'warning'
+    type: 'warning',
+    articleUrl: 'https://mausam.imd.gov.in'
   },
   {
     id: 'news-3',
@@ -157,7 +159,8 @@ export const NEWS_ITEMS = [
     description: 'Food Corporation of India increases rice procurement at higher MSP',
     date: new Date().toISOString(),
     source: 'FCI',
-    type: 'info'
+    type: 'info',
+    articleUrl: 'https://fci.gov.in'
   }
 ];
 
