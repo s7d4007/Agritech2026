@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="AgriSahayak" />
+    <meta name="theme-color" content="#16a34a" />
+    <meta name="description" content="Empowering Indian Farmers with Smart, Offline-First Agricultural Intelligence" />
+    <meta name="keywords" content="agriculture, farming, crop advisory, market prices, disease detection, India" />
+    <meta name="author" content="AgriTech India" />
+    
+    <!-- Open Graph for Social Sharing -->
+    <meta property="og:title" content="AgriSahayak - Smart Agricultural Intelligence" />
+    <meta property="og:description" content="Get hyperlocal crop recommendations, real-time market prices, offline disease detection, and agricultural news." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://agrisahayak.com" />
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="apple-touch-icon" href="/images/icon-192x192.png" />
+    
+    <!-- Security Headers -->
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    
+    <title>AgriSahayak - Smart Agricultural Intelligence</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/service-worker.js')
+            .then(reg => console.log('Service Worker registered'))
+            .catch(err => console.log('Service Worker registration failed'));
+        });
+      }
+      
+      // Check offline status
+      window.addEventListener('offline', () => {
+        console.log('App is offline');
+        document.body.classList.add('app-offline');
+      });
+      
+      window.addEventListener('online', () => {
+        console.log('App is online');
+        document.body.classList.remove('app-offline');
+      });
+    </script>
+  </body>
+</html>
