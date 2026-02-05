@@ -12,11 +12,18 @@ const SettingsPage: React.FC = () => {
 
   useEffect(() => {
     updateDBSize();
+    // Update cache size every 5 seconds to show real-time changes
+    const interval = setInterval(updateDBSize, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const updateDBSize = async () => {
-    const size = await getDBSize();
-    setDBSize(size);
+    try {
+      const size = await getDBSize();
+      setDBSize(size);
+    } catch (_error) {
+      console.error('Error updating DB size:', _error);
+    }
   };
 
   const handleClearCache = async () => {
@@ -31,7 +38,7 @@ const SettingsPage: React.FC = () => {
         setMessage('Cache cleared successfully!');
         setTimeout(() => setMessage(''), 3000);
         await updateDBSize();
-      } catch (error) {
+      } catch {
         setMessage('Failed to clear cache');
       } finally {
         setLoading(false);

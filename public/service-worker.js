@@ -5,6 +5,31 @@ const CACHE_NAMES = {
   IMAGES: `${CACHE_VERSION}-images`,
 };
 
+// Helper function to get cache size
+async function getCacheSize() {
+  const cacheNames = await caches.keys();
+  let totalSize = 0;
+  
+  for (const name of cacheNames) {
+    const cache = await caches.open(name);
+    const keys = await cache.keys();
+    
+    for (const request of keys) {
+      try {
+        const response = await cache.match(request);
+        if (response) {
+          const blob = await response.blob();
+          totalSize += blob.size;
+        }
+      } catch (e) {
+        console.log('Error getting cache size:', e);
+      }
+    }
+  }
+  
+  return totalSize;
+}
+
 const urlsToCache = [
   '/',
   '/index.html',
@@ -142,11 +167,11 @@ self.addEventListener('sync', (event) => {
 async function syncPrices() {
   try {
     const response = await fetch('/api/prices');
-    const data = await response.json();
-    
-    const cache = await caches.open(CACHE_NAMES.DYNAMIC);
-    cache.put('/api/prices', new Response(JSON.stringify(data)));
-    
+    if (response.ok) {
+      const data = await response.json();
+      const cache = await caches.open(CACHE_NAMES.DYNAMIC);
+      cache.put('/api/prices', response.clone());
+    }
     return true;
   } catch (error) {
     console.log('Sync prices failed:', error);
@@ -157,17 +182,26 @@ async function syncPrices() {
 async function syncNews() {
   try {
     const response = await fetch('/api/news');
-    const data = await response.json();
-    
-    const cache = await caches.open(CACHE_NAMES.DYNAMIC);
-    cache.put('/api/news', new Response(JSON.stringify(data)));
-    
+    if (response.ok) {
+      const data = await response.json();
+      const cache = await caches.open(CACHE_NAMES.DYNAMIC);
+      cache.put('/api/news', response.clone());
+    }
     return true;
   } catch (error) {
     console.log('Sync news failed:', error);
     return false;
   }
 }
+
+// Message handler to send cache size to client
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'GET_CACHE_SIZE') {
+    getCacheSize().then((size) => {
+      event.ports[0].postMessage({ cacheSize: size });
+    });
+  }
+});
 
 // Push notifications
 self.addEventListener('push', (event) => {
@@ -190,7 +224,7 @@ self.addEventListener('notificationclick', (event) => {
     clients.matchAll({ type: 'window' }).then((clientList) => {
       for (const client of clientList) {
         if (client.url === '/' && 'focus' in client) {
-          return (client as WindowClient).focus();
+          return client.focus();
         }
       }
       if (clients.openWindow) {

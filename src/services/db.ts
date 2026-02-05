@@ -204,13 +204,45 @@ export const clearDatabase = async () => {
 };
 
 export const getDBSize = async () => {
-  if (!navigator.storage || !navigator.storage.estimate) {
+  try {
+    // Get IndexedDB size via Storage API
+    if (!navigator.storage || !navigator.storage.estimate) {
+      return { usage: 0, quota: 0 };
+    }
+
+    const estimate = await navigator.storage.estimate();
+    let cacheSize = 0;
+
+    // Try to get cache size from service worker if available
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      try {
+        const response = await new Promise<{ cacheSize: number }>((resolve, reject) => {
+          const messageChannel = new MessageChannel();
+          if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage(
+              { type: 'GET_CACHE_SIZE' },
+              [messageChannel.port2]
+            );
+          }
+          messageChannel.port1.onmessage = (event) => {
+            resolve(event.data);
+          };
+          setTimeout(() => reject('Timeout'), 5000);
+        });
+        cacheSize = response.cacheSize || 0;
+      } catch (error) {
+        console.log('Could not get cache size from service worker:', error);
+      }
+    }
+
+    const totalUsage = (estimate.usage || 0) + cacheSize;
+
+    return {
+      usage: totalUsage,
+      quota: estimate.quota || 0,
+    };
+  } catch (error) {
+    console.error('Error getting DB size:', error);
     return { usage: 0, quota: 0 };
   }
-
-  const estimate = await navigator.storage.estimate();
-  return {
-    usage: estimate.usage || 0,
-    quota: estimate.quota || 0,
-  };
 };

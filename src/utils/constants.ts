@@ -196,10 +196,7 @@ export const MARKET_PRICES = [
 // Supported languages
 export const LANGUAGES = [
   { code: 'en', name: 'English' },
-  { code: 'hi', name: 'हिंदी' },
-  { code: 'mr', name: 'मराठी' },
-  { code: 'gu', name: 'ગુજરાતી' },
-  { code: 'pa', name: 'ਪੰਜਾਬੀ' }
+  { code: 'hi', name: 'हिंदी' }
 ];
 
 // App version

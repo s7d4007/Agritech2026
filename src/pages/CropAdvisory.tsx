@@ -10,9 +10,9 @@ const CropAdvisory: React.FC = () => {
   const [district, setDistrict] = useState('');
   const [season, setSeason] = useState('');
   const [soilType, setSoilType] = useState('');
-  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [recommendations, setRecommendations] = useState<Crop[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedCrop, setSelectedCrop] = useState<any>(null);
+  const [selectedCrop, setSelectedCrop] = useState<Crop | null>(null);
 
   // Get available states
   const states = getAllStates();

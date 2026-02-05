@@ -12,6 +12,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { path: '/', label: t('nav.home') },
     { path: '/crop-advisory', label: t('nav.cropAdvisory') },
     { path: '/prices', label: t('nav.priceInfo') },
+    { path: '/price-calculator', label: t('nav.priceCalculator') },
     { path: '/disease-detector', label: t('nav.diseaseDetector') },
     { path: '/news', label: t('nav.news') },
     { path: '/settings', label: t('nav.settings') },
@@ -195,7 +196,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </div>
           </div>
           <div className="border-t border-secondary-700 pt-8 text-center text-sm text-gray-400">
-            <p>&copy; 2024 AgriSahayak. All rights reserved. | Made with ❤️ for Indian Farmers</p>
+            <p>&copy; {new Date().getFullYear()} AgriSahayak. All rights reserved. | Made with ❤️ for Indian Farmers</p>
           </div>
         </div>
       </footer>

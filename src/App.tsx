@@ -6,6 +6,7 @@ import Layout from './components/Layout';
 import Home from './pages/Home';
 import CropAdvisory from './pages/CropAdvisory';
 import PriceDashboard from './pages/PriceDashboard';
+import PriceCalculator from './pages/PriceCalculator';
 import DiseaseDetector from './pages/DiseaseDetector';
 import NewsAlerts from './pages/NewsAlerts';
 import SettingsPage from './pages/Settings';
@@ -43,6 +44,7 @@ const App: React.FC = () => {
             <Route path="/" element={<Home />} />
             <Route path="/crop-advisory" element={<CropAdvisory />} />
             <Route path="/prices" element={<PriceDashboard />} />
+            <Route path="/price-calculator" element={<PriceCalculator />} />
             <Route path="/disease-detector" element={<DiseaseDetector />} />
             <Route path="/news" element={<NewsAlerts />} />
             <Route path="/settings" element={<SettingsPage />} />
