@@ -34,7 +34,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             {/* Logo */}
             <Link to="/" className="flex items-center gap-2 group">
               <div className="p-0">
-                <img src="/logo.png" alt="AgriSahayak" className="w-10 h-10 rounded-full object-cover" />
+                <img
+                  src="/logo.png"
+                  alt="AgriSahayak"
+                  className="w-10 h-10 rounded-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = '/fallback-logo.png'; // Fallback image
+                  }}
+                />
               </div>
               <div className="hidden sm:block">
                 <h1 className="text-xl font-bold text-primary-700">AgriSahayak</h1>

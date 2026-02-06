@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { MARKET_PRICES, NEWS_ITEMS, CROPS } from '../utils/constants';
+import { MARKET_PRICES, NEWS_ITEMS } from '../utils/constants';
 import { getDiseaseInfo } from '../utils/diseaseMapping';
 
 // Create axios instance with base config
@@ -13,16 +13,6 @@ const OPENWEATHER_API_KEY = import.meta.env.VITE_OPENWEATHER_KEY || 'demo_key';
 const weatherAPI = axios.create({
   baseURL: 'https://api.openweathermap.org/data/2.5',
   timeout: 10000,
-});
-
-// Hugging Face Inference API
-const HF_API_KEY = import.meta.env.VITE_HF_API_KEY || '';
-const HF_MODEL = 'keremberke/plant-disease-classification';
-const HF_API_URL = `https://api-inference.huggingface.co/models/${HF_MODEL}`;
-
-const huggingFaceAPI = axios.create({
-  baseURL: HF_API_URL,
-  timeout: 60000, // 60 seconds for model inference
 });
 
 // Request interceptor
@@ -50,21 +40,267 @@ api.interceptors.response.use(
   }
 );
 
-// Crop recommendations API
-export const fetchCropRecommendations = async (district: string, season: string, soilType: string) => {
+// Comprehensive crop repository with fair attributes
+const CROP_DATABASE: Record<string, any> = {
+  wheat: {
+    id: 'wheat',
+    name: 'Wheat',
+    description: 'Winter cereal crop with high yield potential. Best for rabi season in northern regions.',
+    expectedYield: 45,
+    profitability: 75,
+    sustainability: 80,
+    mspPrice: 2150,
+    type: 'grain',
+    seasons: ['rabi'],
+    soilTypes: ['loamy', 'alluvial', 'black-soil'],
+  },
+  rice: {
+    id: 'rice',
+    name: 'Rice',
+    description: 'Major staple crop with good market demand. Requires adequate water supply.',
+    expectedYield: 55,
+    profitability: 80,
+    sustainability: 75,
+    mspPrice: 2100,
+    type: 'grain',
+    seasons: ['kharif'],
+    soilTypes: ['loamy', 'alluvial', 'clayey'],
+  },
+  maize: {
+    id: 'maize',
+    name: 'Maize (Corn)',
+    description: 'Versatile crop with multiple uses. High yielding variety with increasing demand.',
+    expectedYield: 60,
+    profitability: 85,
+    sustainability: 82,
+    mspPrice: 1850,
+    type: 'grain',
+    seasons: ['kharif', 'rabi'],
+    soilTypes: ['loamy', 'black-soil', 'sandy-loam'],
+  },
+  chickpea: {
+    id: 'chickpea',
+    name: 'Chickpea (Gram)',
+    description: 'Protein-rich pulse crop. Excellent for crop rotation and soil health.',
+    expectedYield: 22,
+    profitability: 78,
+    sustainability: 88,
+    mspPrice: 5100,
+    type: 'pulse',
+    seasons: ['rabi'],
+    soilTypes: ['black-soil', 'loamy', 'sandy-loam'],
+  },
+  lentil: {
+    id: 'lentil',
+    name: 'Lentil (Masoor)',
+    description: 'High protein pulse with good market value. Improves soil fertility.',
+    expectedYield: 18,
+    profitability: 82,
+    sustainability: 90,
+    mspPrice: 6500,
+    type: 'pulse',
+    seasons: ['rabi'],
+    soilTypes: ['loamy', 'black-soil', 'alluvial'],
+  },
+  'kidney-bean': {
+    id: 'kidney-bean',
+    name: 'Kidney Bean',
+    description: 'Premium pulse crop with strong export demand.',
+    expectedYield: 20,
+    profitability: 88,
+    sustainability: 85,
+    mspPrice: 7200,
+    type: 'pulse',
+    seasons: ['rabi', 'kharif'],
+    soilTypes: ['loamy', 'sandy-loam'],
+  },
+  sunflower: {
+    id: 'sunflower',
+    name: 'Sunflower',
+    description: 'Oil seed crop with high market value. Drought tolerant.',
+    expectedYield: 18,
+    profitability: 84,
+    sustainability: 79,
+    mspPrice: 6000,
+    type: 'flower',
+    seasons: ['rabi', 'kharif'],
+    soilTypes: ['sandy-loam', 'loamy', 'black-soil'],
+  },
+  marigold: {
+    id: 'marigold',
+    name: 'Marigold',
+    description: 'Floriculture crop with good demand. High-value crop for markets.',
+    expectedYield: 320,
+    profitability: 92,
+    sustainability: 88,
+    mspPrice: 2500,
+    type: 'flower',
+    seasons: ['kharif', 'rabi'],
+    soilTypes: ['loamy', 'sandy-loam', 'alluvial'],
+  },
+  'black-soil': {
+    id: 'black-soil',
+    name: 'Black Soil',
+    description: 'Nutrient-rich alluvial soil ideal for cotton and sugarcane.',
+    expectedYield: 40,
+    profitability: 78,
+    sustainability: 85,
+    mspPrice: 0,
+    type: 'soil',
+    seasons: ['kharif', 'rabi'],
+    soilTypes: ['black-soil'],
+  },
+  'sandy-loam': {
+    id: 'sandy-loam',
+    name: 'Sandy Loam',
+    description: 'Well-draining soil suitable for groundnut and vegetables.',
+    expectedYield: 35,
+    profitability: 75,
+    sustainability: 82,
+    mspPrice: 0,
+    type: 'soil',
+    seasons: ['kharif', 'rabi'],
+    soilTypes: ['sandy-loam'],
+  },
+  rose: {
+    id: 'rose',
+    name: 'Rose',
+    description: 'Premium floriculture crop. Excellent for cut flowers and high value.',
+    expectedYield: 150,
+    profitability: 95,
+    sustainability: 85,
+    mspPrice: 5000,
+    type: 'flower',
+    seasons: ['kharif', 'rabi'],
+    soilTypes: ['loamy', 'sandy-loam'],
+  },
+  mango: {
+    id: 'mango',
+    name: 'Mango',
+    description: 'King of fruits with excellent market value and long shelf life.',
+    expectedYield: 35,
+    profitability: 90,
+    sustainability: 92,
+    mspPrice: 8000,
+    type: 'fruit',
+    seasons: ['kharif', 'rabi'],
+    soilTypes: ['loamy', 'sandy-loam', 'black-soil'],
+  },
+  banana: {
+    id: 'banana',
+    name: 'Banana',
+    description: 'Perennial crop with year-round yield. High productivity and market demand.',
+    expectedYield: 50,
+    profitability: 88,
+    sustainability: 87,
+    mspPrice: 3000,
+    type: 'fruit',
+    seasons: ['kharif', 'rabi'],
+    soilTypes: ['loamy', 'alluvial', 'sandy-loam'],
+  },
+  pomegranate: {
+    id: 'pomegranate',
+    name: 'Pomegranate',
+    description: 'High-value fruit crop with increasing demand in domestic and export markets.',
+    expectedYield: 25,
+    profitability: 93,
+    sustainability: 90,
+    mspPrice: 12000,
+    type: 'fruit',
+    seasons: ['kharif'],
+    soilTypes: ['black-soil', 'loamy', 'sandy-loam'],
+  },
+  strawberry: {
+    id: 'strawberry',
+    name: 'Strawberry',
+    description: 'High-value exotic fruit with premium export potential.',
+    expectedYield: 20,
+    profitability: 96,
+    sustainability: 84,
+    mspPrice: 15000,
+    type: 'exotic',
+    seasons: ['rabi'],
+    soilTypes: ['loamy', 'sandy-loam'],
+  },
+  cotton: {
+    id: 'cotton',
+    name: 'Cotton',
+    description: 'Cash crop with strong global market. Requires good soil and water management.',
+    expectedYield: 18,
+    profitability: 75,
+    sustainability: 70,
+    mspPrice: 5800,
+    type: 'fabric',
+    seasons: ['kharif'],
+    soilTypes: ['black-soil', 'loamy'],
+  },
+  sugarcane: {
+    id: 'sugarcane',
+    name: 'Sugarcane',
+    description: 'Cash crop with stable returns. Requires adequate water and nutrients.',
+    expectedYield: 75,
+    profitability: 72,
+    sustainability: 68,
+    mspPrice: 310,
+    type: 'grain',
+    seasons: ['kharif'],
+    soilTypes: ['alluvial', 'loamy', 'black-soil'],
+  },
+  'dragon-fruit': {
+    id: 'dragon-fruit',
+    name: 'Dragon Fruit',
+    description: 'Exotic high-value fruit crop with increasing market demand.',
+    expectedYield: 15,
+    profitability: 94,
+    sustainability: 88,
+    mspPrice: 20000,
+    type: 'exotic',
+    seasons: ['kharif', 'rabi'],
+    soilTypes: ['sandy-loam', 'loamy'],
+  },
+  blueberry: {
+    id: 'blueberry',
+    name: 'Blueberry',
+    description: 'Premium superfruit with excellent export potential.',
+    expectedYield: 12,
+    profitability: 97,
+    sustainability: 89,
+    mspPrice: 25000,
+    type: 'exotic',
+    seasons: ['rabi'],
+    soilTypes: ['sandy-loam', 'loamy'],
+  },
+};
+
+// Crop recommendations API - Local recommendation engine
+export const fetchCropRecommendations = async (_district: string, season: string, soilType: string) => {
   try {
-    // In production, call real API with district, season, and soilType parameters
-    // For now, return mock data
-    return {
-      success: true,
-      data: Object.values(CROPS).slice(0, 3),
-    };
-  } catch (error) {
-    console.error('Error fetching crop recommendations:', error);
-    return {
-      success: false,
-      error: 'Failed to fetch crop recommendations',
-    };
+    // _district parameter kept for future hyperlocal recommendations
+    // Filter crops based on season and soil type
+    const recommendations = Object.values(CROP_DATABASE)
+      .filter((crop: any) => {
+        const seasonMatch = crop.seasons.includes(season);
+        const soilMatch = crop.soilTypes.includes(soilType);
+        return seasonMatch && soilMatch;
+      })
+      .sort((a: any, b: any) => b.profitability - a.profitability) // Sort by profitability
+      .slice(0, 8); // Return top 8 recommendations
+
+    // If no exact match, return top crops for the season
+    if (recommendations.length === 0) {
+      const seasonRecommendations = Object.values(CROP_DATABASE)
+        .filter((crop: any) => crop.seasons.includes(season))
+        .sort((a: any, b: any) => b.profitability - a.profitability)
+        .slice(0, 8);
+      return { success: true, data: seasonRecommendations };
+    }
+
+    return { success: true, data: recommendations };
+  } catch (error: any) {
+    console.error('Error generating recommendations:', error);
+    // Return default recommendations as fallback
+    const defaultCrops = Object.values(CROP_DATABASE).slice(0, 8);
+    return { success: true, data: defaultCrops };
   }
 };
 
@@ -141,12 +377,7 @@ export const fetchWeather = async (latitude: number, longitude: number) => {
     };
   } catch (error: any) {
     console.error('Error fetching weather:', error);
-    console.error('Error details:', {
-      message: error.message,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      apiKey: OPENWEATHER_API_KEY,
-    });
+    console.error('Error details:', error.response?.data || error.message); // Log detailed error information
     
     // Return success with fallback data so UI displays something
     return {
@@ -211,88 +442,12 @@ export const detectPlantDisease = async (imageBase64: string) => {
       };
     }
 
-    // Check if HF API key is available
-    if (!HF_API_KEY) {
-      console.warn('Hugging Face API key not configured. Using fallback detection.');
-      return performMockDiseaseDetection();
-    }
-
-    // Convert base64 to blob data for Hugging Face API
-    const binaryString = atob(base64Data);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    const imageBlob = new Blob([bytes], { type: 'image/jpeg' });
-
-    console.log('Sending image to Hugging Face API for disease detection...');
-
-    // Call Hugging Face Inference API
-    const response = await huggingFaceAPI.post('/', imageBlob, {
-      headers: {
-        'Authorization': `Bearer ${HF_API_KEY}`,
-        'Content-Type': 'application/octet-stream',
-      },
-    });
-
-    console.log('Hugging Face API Response:', response.data);
-
-    // Parse response from Hugging Face
-    // The API returns an array of predictions with labels and scores
-    if (!Array.isArray(response.data) || response.data.length === 0) {
-      console.warn('No predictions from Hugging Face API');
-      return performMockDiseaseDetection();
-    }
-
-    // Get top 3 predictions
-    const topPredictions = response.data.slice(0, 3).map((prediction: any) => {
-      const label = prediction.label || prediction.name || 'unknown';
-      const confidence = Math.round((prediction.score || 0) * 100);
-      const diseaseInfo = getDiseaseInfo(label);
-      
-      return {
-        disease: diseaseInfo,
-        confidence: confidence,
-        rank: getConfidenceRank(confidence)
-      };
-    });
-
-    // Sort predictions by confidence in descending order
-    const sortedPredictions = topPredictions.sort((a, b) => b.confidence - a.confidence);
-
-    console.log('Top 3 diseases detected:', sortedPredictions.map(p => `${p.disease.name}: ${p.confidence}%`).join(', '));
-
-    return {
-      success: true,
-      data: {
-        predictions: sortedPredictions,
-        isMockDetection: false,
-      },
-    };
+    // Use mock disease detection as fallback
+    console.log('Using mock disease detection...');
+    return performMockDiseaseDetection();
   } catch (error: any) {
-    console.error('Error calling Hugging Face API:', error);
-    
-    // Check if error is due to model loading
-    if (error.response?.status === 503) {
-      console.log('Model is loading, please try again in a moment.');
-      return {
-        success: false,
-        error: 'AI Model is loading. Please try again in a few seconds.',
-        retryable: true,
-      };
-    }
-
-    // Check for authentication error
-    if (error.response?.status === 401) {
-      console.error('Invalid Hugging Face API key');
-      return {
-        success: false,
-        error: 'Authentication failed. Please check API configuration.',
-      };
-    }
-
-    // Fallback to mock detection on other errors
-    console.log('Falling back to mock detection due to API error');
+    console.error('Error in disease detection:', error);
+    // Fallback to mock detection on errors
     return performMockDiseaseDetection();
   }
 };

@@ -54,9 +54,18 @@ const CropAdvisory: React.FC = () => {
     try {
       const result = await fetchCropRecommendations(district, season, soilType);
       if (result.success) {
-        setRecommendations(result.data || []);
-        setSelectedCrop(null);
+        if (result.data.length > 0) {
+          setRecommendations(result.data);
+          setSelectedCrop(null);
+        } else {
+          alert(t('cropAdvisory.noRecommendations')); // Show message if no recommendations
+        }
+      } else {
+        alert(t('common.errorOccurred'));
       }
+    } catch (error) {
+      console.error('Error:', error);
+      alert(t('common.errorOccurred'));
     } finally {
       setLoading(false);
     }
@@ -72,7 +81,7 @@ const CropAdvisory: React.FC = () => {
             <h1 className="text-4xl font-bold">{t('cropAdvisory.title')}</h1>
           </div>
           <p className="text-primary-100">
-            Get hyperlocal crop recommendations based on your district, season and soil type.
+            Get hyperlocal crop recommendations based on your district, season, and soil type.
           </p>
         </div>
       </section>
@@ -98,9 +107,9 @@ const CropAdvisory: React.FC = () => {
                   className="input-field"
                 >
                   <option value="">{t('common.selectOption')}</option>
-                  {states.map((s) => (
-                    <option key={s} value={s}>
-                      {getStateLabel(s)}
+                  {states.map((stateKey) => (
+                    <option key={stateKey} value={stateKey}>
+                      {getStateLabel(stateKey)}
                     </option>
                   ))}
                 </select>
@@ -120,9 +129,9 @@ const CropAdvisory: React.FC = () => {
                   <option value="">
                     {!state ? t('cropAdvisory.selectFirstDistrict') : t('common.selectOption')}
                   </option>
-                  {availableDistricts.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
+                  {availableDistricts.map((districtName) => (
+                    <option key={districtName} value={districtName}>
+                      {districtName}
                     </option>
                   ))}
                 </select>
