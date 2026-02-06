@@ -1,45 +1,206 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Camera, Upload, AlertCircle, CheckCircle, Info } from 'lucide-react';
+import { Camera, Upload, AlertCircle, Info, Loader } from 'lucide-react';
 import { saveDiagnostic } from '../services/db';
 import { detectPlantDisease } from '../services/api';
+import type { DiseaseInfo } from '../utils/diseaseMapping';
+
+interface DetectionResult {
+  predictions: Array<{
+    disease: DiseaseInfo;
+    confidence: number;
+    rank: 'High' | 'Mid' | 'Low';
+  }>;
+  isMockDetection?: boolean;
+}
 
 const DiseaseDetector: React.FC = () => {
   const { t } = useTranslation();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [detectedDisease, setDetectedDisease] = useState<{ name: string; treatment: string; prevention: string } | null>(null);
+  const [detectedDisease, setDetectedDisease] = useState<any>(null);
   const [confidence, setConfidence] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [imageValidationError, setImageValidationError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [showStream, setShowStream] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const simulateDiseaseDetection = async (imageData: string) => {
+  // Constants for image validation
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+  const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  const MIN_IMAGE_DIMENSION = 224; // Minimum for model input
+
+  /**
+   * Validate image file before processing
+   */
+  const validateImageFile = (file: File): { valid: boolean; error?: string } => {
+    // Check file size
+    if (file.size > MAX_FILE_SIZE) {
+      return {
+        valid: false,
+        error: `File size must be less than ${MAX_FILE_SIZE / (1024 * 1024)}MB. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB.`,
+      };
+    }
+
+    // Check file type
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+      return {
+        valid: false,
+        error: 'Please upload a valid image file (JPEG, PNG, or WebP).',
+      };
+    }
+
+    // Check file name length (avoid issues with very long names)
+    if (file.name.length > 255) {
+      return {
+        valid: false,
+        error: 'File name is too long. Please rename the file.',
+      };
+    }
+
+    return { valid: true };
+  };
+
+  /**
+   * Validate image dimensions
+   */
+  const validateImageDimensions = (img: HTMLImageElement): { valid: boolean; error?: string } => {
+    const { width, height } = img;
+
+    if (width < MIN_IMAGE_DIMENSION || height < MIN_IMAGE_DIMENSION) {
+      return {
+        valid: false,
+        error: `Image is too small. Minimum dimensions are ${MIN_IMAGE_DIMENSION}x${MIN_IMAGE_DIMENSION}px. Your image is ${width}x${height}px.`,
+      };
+    }
+
+    // Warn about very large images
+    if (width > 4096 || height > 4096) {
+      console.warn('Image dimensions are very large, processing may take longer');
+    }
+
+    return { valid: true };
+  };
+
+  /**
+   * Handle image file selection from file input or camera
+   */
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processImageFile(file);
+    }
+  };
+
+  /**
+   * Process the selected image file
+   */
+  const processImageFile = (file: File) => {
+    // Reset previous errors
+    setImageValidationError(null);
+    setError(null);
+
+    // Validate file
+    const fileValidation = validateImageFile(file);
+    if (!fileValidation.valid) {
+      setImageValidationError(fileValidation.error || 'Invalid image file');
+      return;
+    }
+
+    // Read file as data URL
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const imageData = event.target?.result as string;
+
+      // Validate image dimensions
+      const img = new Image();
+      img.onload = () => {
+        const dimensionValidation = validateImageDimensions(img);
+        if (!dimensionValidation.valid) {
+          setImageValidationError(dimensionValidation.error || 'Invalid image dimensions');
+          return;
+        }
+
+        // Image is valid, proceed with detection
+        setSelectedImage(imageData);
+        setDetectionResult(null);
+        setError(null);
+        setImageValidationError(null);
+        performDiseaseDetection(imageData);
+      };
+
+      img.onerror = () => {
+        setImageValidationError('Failed to load image. Please try a different image.');
+      };
+
+      img.src = imageData;
+    };
+
+    reader.onerror = () => {
+      setImageValidationError('Failed to read file. Please try again.');
+    };
+
+    reader.readAsDataURL(file);
+  };
+
+  /**
+   * Perform disease detection on the image
+   */
+  const performDiseaseDetection = async (imageData: string) => {
     setAnalyzing(true);
     setError(null);
-    
+
     try {
-      // Call the API to detect disease
+      console.log('Initiating disease detection...');
       const result = await detectPlantDisease(imageData);
-      
-      if (result.success && result.data) {
-        setDetectedDisease(result.data.disease);
-        setConfidence(result.data.confidence);
-        
-        // Save to IndexedDB
-        await saveDiagnostic({
-          imageData,
-          result: { disease: result.data.disease, confidence: result.data.confidence }
-        });
+
+      if (result.success) {
+        // Handle new format with multiple predictions
+        const resultData = result as any;
+        if (resultData.data?.predictions) {
+          const detectionData: DetectionResult = {
+            predictions: resultData.data.predictions,
+            isMockDetection: resultData.data.isMockDetection || false,
+          };
+
+          console.log('Raw predictions:', resultData.data.predictions);
+
+          setDetectionResult(detectionData);
+
+          // Save to IndexedDB
+          try {
+            await saveDiagnostic({
+              imageData,
+              result: {
+                disease: detectionData.predictions[0].disease.name,
+                confidence: detectionData.predictions[0].confidence,
+                timestamp: new Date().toISOString(),
+              },
+            });
+            console.log('Detection result saved to database');
+          } catch (dbError) {
+            console.error('Failed to save to database:', dbError);
+            // Don't fail the detection if database save fails
+          }
+
+          // Show info about mock detection
+          if (detectionData.isMockDetection) {
+            setError(
+              'Using offline detection. For more accurate results, configure Hugging Face API integration.'
+            );
+          }
+        }
+      } else if ((result as any).retryable) {
+        setError((result as any).error || 'Detection service is loading. Please try again in a moment.');
       } else {
-        setError(t('disease.errorDetectDisease'));
+        setError('Unable to detect disease. Please try another image.');
       }
     } catch (err) {
       console.error('Error during detection:', err);
-      setError(t('disease.errorDetectionFailed'));
+      setError('An error occurred during detection. Please try again.');
     } finally {
       setAnalyzing(false);
     }
@@ -50,13 +211,13 @@ const DiseaseDetector: React.FC = () => {
     if (file) {
       // Check file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        setError(t('disease.errorFileSize'));
+        setError('File size must be less than 5MB');
         return;
       }
 
       // Check file type
       if (!file.type.startsWith('image/')) {
-        setError(t('disease.errorImageType'));
+        setError('Please upload an image file');
         return;
       }
 
@@ -69,7 +230,7 @@ const DiseaseDetector: React.FC = () => {
         simulateDiseaseDetection(imageData);
       };
       reader.onerror = () => {
-        setError(t('disease.errorReadFile'));
+        setError('Failed to read file');
       };
       reader.readAsDataURL(file);
     }
@@ -79,7 +240,7 @@ const DiseaseDetector: React.FC = () => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        setError(t('disease.errorFileSize'));
+        setError('File size must be less than 5MB');
         return;
       }
 
@@ -92,70 +253,34 @@ const DiseaseDetector: React.FC = () => {
         simulateDiseaseDetection(imageData);
       };
       reader.onerror = () => {
-        setError(t('disease.errorCaptureImage'));
+        setError('Failed to capture image');
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // Start live camera stream (modal)
-  const startCameraStream = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        // Mute to allow autoplay in browsers
-        if (videoRef.current) { videoRef.current.muted = true; }
-        if (videoRef.current) { void videoRef.current.play().catch(() => { /* ignore */ }); }
-      }
-      setShowStream(true);
-    } catch (err) {
-      console.error('Camera access denied or not available', err);
-      setError(t('disease.errorCameraNotAvailable'));
-    }
-  };
-
-  const stopCameraStream = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) {
-      if (videoRef.current) { videoRef.current.pause(); }
-      videoRef.current.srcObject = null;
-    }
-    setShowStream(false);
-  };
-
-  const captureFromStream = async () => {
-    if (!videoRef.current) return;
-    const video = videoRef.current;
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL('image/jpeg');
-    setSelectedImage(dataUrl);
-    setDetectedDisease(null);
-    setError(null);
-    stopCameraStream();
-    await simulateDiseaseDetection(dataUrl);
-  };
-
-  useEffect(() => {
-    return () => {
-      stopCameraStream();
-    };
-  }, []);
-
   const handleReset = () => {
     setSelectedImage(null);
-    setDetectedDisease(null);
-    setConfidence(0);
+    setDetectionResult(null);
     setError(null);
+    setImageValidationError(null);
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = '';
+    }
+  };
+
+  /**
+   * Get confidence color
+   */
+  const getConfidenceColor = (confidence: number): string => {
+    if (confidence >= 80) return 'text-green-600';
+    if (confidence >= 60) return 'text-blue-600';
+    if (confidence >= 40) return 'text-orange-600';
+    return 'text-red-600';
   };
 
   return (
@@ -175,12 +300,12 @@ const DiseaseDetector: React.FC = () => {
 
       {/* Main Content */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Error Message */}
-        {error && (
+        {/* Error Messages */}
+        {imageValidationError && (
           <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-800 rounded-lg flex items-start gap-3">
             <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold">{t('common.error')}</p>
+              <p className="font-semibold">Error</p>
               <p className="text-sm">{error}</p>
             </div>
           </div>
@@ -191,8 +316,17 @@ const DiseaseDetector: React.FC = () => {
           <div className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* Upload Option */}
-              <div className="card cursor-pointer hover:border-primary-400 transition-all"
-                onClick={() => fileInputRef.current?.click()}>
+              <div
+                className="card cursor-pointer hover:border-primary-400 transition-all hover:shadow-lg"
+                onClick={() => fileInputRef.current?.click()}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    fileInputRef.current?.click();
+                  }
+                }}
+              >
                 <div className="text-center">
                   <div className="bg-primary-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
                     <Upload className="w-10 h-10 text-primary-600" />
@@ -201,23 +335,25 @@ const DiseaseDetector: React.FC = () => {
                     {t('disease.uploadPhoto')}
                   </h3>
                   <p className="text-accent-600 mb-4">
-                    {t('disease.selectFromDevice')}
+                    Select a photo from your device
                   </p>
                   <button className="btn-primary w-full">
-                    {t('disease.chooseFile')}
+                    Choose File
                   </button>
                 </div>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept={ACCEPTED_IMAGE_TYPES.join(',')}
                   onChange={handleImageUpload}
                   className="hidden"
+                  aria-label="Upload image file"
                 />
               </div>
 
               {/* Camera Option */}
-              <div className="card cursor-pointer hover:border-primary-400 transition-all">
+              <div className="card cursor-pointer hover:border-primary-400 transition-all"
+                onClick={() => cameraInputRef.current?.click()}>
                 <div className="text-center">
                   <div className="bg-secondary-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
                     <Camera className="w-10 h-10 text-secondary-600" />
@@ -226,19 +362,20 @@ const DiseaseDetector: React.FC = () => {
                     {t('disease.takePhoto')}
                   </h3>
                   <p className="text-accent-600 mb-4">
-                    {t('disease.captureUsingCamera')}
+                    Capture a photo using your camera
                   </p>
-                  <button className="btn-secondary w-full" onClick={(e) => { e.stopPropagation(); startCameraStream(); }}>
-                    {t('disease.openCamera')}
+                  <button className="btn-secondary w-full">
+                    Open Camera
                   </button>
                 </div>
                 <input
                   ref={cameraInputRef}
                   type="file"
-                  accept="image/*"
+                  accept={ACCEPTED_IMAGE_TYPES.join(',')}
                   capture="environment"
-                  onChange={handleCameraCapture}
+                  onChange={handleImageUpload}
                   className="hidden"
+                  aria-label="Capture image from camera"
                 />
               </div>
             </div>
@@ -269,10 +406,10 @@ const DiseaseDetector: React.FC = () => {
                 {t('disease.tipsTitle')}
               </h3>
               <ul className="space-y-2 text-accent-700">
-                <li>✓ {t('disease.tip1')}</li>
-                <li>✓ {t('disease.tip2')}</li>
-                <li>✓ {t('disease.tip3')}</li>
-                <li>✓ {t('disease.tip4')}</li>
+                <li>✓ Capture the affected leaf clearly</li>
+                <li>✓ Ensure good lighting for accurate detection</li>
+                <li>✓ Show the disease symptoms clearly</li>
+                <li>✓ Works offline - no internet needed</li>
               </ul>
             </div>
           </div>
@@ -290,7 +427,7 @@ const DiseaseDetector: React.FC = () => {
                 onClick={handleReset}
                 className="btn-outline w-full"
               >
-                {t('disease.checkAnotherLeaf')}
+                Take Another Photo
               </button>
             </div>
 
@@ -298,70 +435,167 @@ const DiseaseDetector: React.FC = () => {
             {analyzing ? (
               <div className="card text-center py-12">
                 <div className="inline-block">
-                  <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary-200 border-t-primary-600 mb-4"></div>
+                  <Loader className="w-16 h-16 animate-spin text-primary-600 mb-4" />
                 </div>
                 <h3 className="text-xl font-bold text-accent-900 mb-2">
                   {t('disease.analyzing')}
                 </h3>
-                <p className="text-accent-600">{t('disease.analyzingDescription')}</p>
+                <p className="text-accent-600">
+                  Using AI to identify disease in your crop...
+                </p>
               </div>
-            ) : detectedDisease ? (
+            ) : detectionResult ? (
               <div className="space-y-6">
-                {/* Disease Result Card */}
-                <div className="card bg-gradient-to-r from-primary-50 to-secondary-50">
-                  <div className="flex items-start justify-between mb-6">
-                    <div className="flex items-start gap-4">
-                      <CheckCircle className="w-8 h-8 text-green-600 flex-shrink-0 mt-1" />
-                      <div>
-                        <h2 className="text-3xl font-bold text-accent-900 mb-2">
-                          {detectedDisease.name}
-                        </h2>
-                        <div className="flex items-center gap-4">
-                          <span className="badge-success">
-                            {t('disease.confidence')}: {confidence}%
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                {/* Results Header */}
+                <div className="card bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200">
+                  <h2 className="text-2xl font-bold text-accent-900 mb-2">
+                    🔍 Top Disease Predictions
+                  </h2>
+                  <p className="text-accent-600">
+                    Based on AI analysis of your image, here are the 3 most likely conditions detected:
+                  </p>
                 </div>
 
-                {/* Treatment and Prevention */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Treatment */}
-                  <div className="card border-l-4 border-primary-600">
-                    <h3 className="text-xl font-bold text-accent-900 mb-4 flex items-center gap-2">
-                      <AlertCircle className="w-5 h-5 text-primary-600" />
-                      {t('disease.treatment')}
-                    </h3>
-                    <p className="text-accent-700 leading-relaxed">
-                      {detectedDisease.treatment}
-                    </p>
-                  </div>
+                {/* Predictions Grid - 3 Options */}
+                <div className="grid grid-cols-1 gap-6">
+                  {detectionResult.predictions.map((prediction, index) => (
+                    <div
+                      key={index}
+                      className={`card border-2 transition-all hover:shadow-lg ${
+                        prediction.rank === 'High'
+                          ? 'bg-green-50 border-green-400'
+                          : prediction.rank === 'Mid'
+                          ? 'bg-yellow-50 border-yellow-400'
+                          : 'bg-orange-50 border-orange-400'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="text-2xl font-bold text-gray-700">#{index + 1}</span>
+                            <span className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${
+                              prediction.rank === 'High'
+                                ? 'bg-green-200 text-green-800'
+                                : prediction.rank === 'Mid'
+                                ? 'bg-yellow-200 text-yellow-800'
+                                : 'bg-orange-200 text-orange-800'
+                            }`}>
+                              {prediction.rank} Confidence
+                            </span>
+                          </div>
+                          
+                          <h3 className="text-xl font-bold text-accent-900 mb-1">
+                            {prediction.disease.name}
+                          </h3>
+                          <p className="text-sm text-accent-600 mb-3">
+                            {prediction.disease.scientificName && (
+                              <span className="italic">{prediction.disease.scientificName}</span>
+                            )}
+                          </p>
 
-                  {/* Prevention */}
-                  <div className="card border-l-4 border-secondary-600">
-                    <h3 className="text-xl font-bold text-accent-900 mb-4 flex items-center gap-2">
-                      <CheckCircle className="w-5 h-5 text-secondary-600" />
-                      {t('disease.prevention')}
-                    </h3>
-                    <p className="text-accent-700 leading-relaxed">
-                      {detectedDisease.prevention}
-                    </p>
-                  </div>
+                          <div className="mb-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-semibold text-accent-700">Confidence Score</span>
+                              <span className={`text-lg font-bold ${getConfidenceColor(prediction.confidence)}`}>
+                                {prediction.confidence}%
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-300 rounded-full h-3">
+                              <div
+                                className={`h-3 rounded-full transition-all ${
+                                  prediction.rank === 'High'
+                                    ? 'bg-green-500'
+                                    : prediction.rank === 'Mid'
+                                    ? 'bg-yellow-500'
+                                    : 'bg-orange-500'
+                                }`}
+                                style={{ width: `${prediction.confidence}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          <p className="text-sm text-accent-700 mb-3">
+                            {prediction.disease.description}
+                          </p>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <p className="font-semibold text-accent-900 mb-1">Cause:</p>
+                              <p className="text-accent-700">{prediction.disease.cause}</p>
+                            </div>
+                            <div>
+                              <p className="font-semibold text-accent-900 mb-1">Symptoms:</p>
+                              <ul className="text-accent-700 space-y-1">
+                                {prediction.disease.symptoms.slice(0, 2).map((symptom, idx) => (
+                                  <li key={idx}>• {symptom}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Treatment & Prevention for this disease */}
+                      <div className="border-t border-gray-300 pt-4 mt-4">
+                        <details className="cursor-pointer">
+                          <summary className="font-bold text-accent-900 hover:text-primary-600">
+                            View Full Details & Treatment {'>'}
+                          </summary>
+                          <div className="mt-4 space-y-4">
+                            <div>
+                              <h4 className="font-bold text-accent-900 mb-2">Treatment Steps:</h4>
+                              <ol className="space-y-2">
+                                {prediction.disease.treatment.slice(0, 3).map((step, idx) => (
+                                  <li key={idx} className="text-sm text-accent-700 flex gap-3">
+                                    <span className="font-bold text-primary-600">{idx + 1}.</span>
+                                    <span>{step}</span>
+                                  </li>
+                                ))}
+                              </ol>
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-accent-900 mb-2">Prevention Measures:</h4>
+                              <ul className="space-y-2">
+                                {prediction.disease.prevention.slice(0, 3).map((measure, idx) => (
+                                  <li key={idx} className="text-sm text-accent-700 flex gap-3">
+                                    <span className="font-bold text-green-600">✓</span>
+                                    <span>{measure}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        </details>
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
                 {/* Additional Tips */}
                 <div className="card bg-green-50">
                   <h3 className="font-bold text-lg text-accent-900 mb-4">
-                    {t('disease.additionalTips')}
+                    Additional Tips
                   </h3>
-                  <ul className="space-y-2 text-accent-700">
-                    <li>✓ {t('disease.useOrganic')}</li>
-                    <li>✓ {t('disease.wateringTips')}</li>
-                    <li>✓ {t('disease.rotationTips')}</li>
-                    <li>✓ {t('disease.consultFarmer')}</li>
+                  <ul className="space-y-2 text-sm text-accent-700">
+                    <li>
+                      <strong className="text-green-700">High Confidence (70%+):</strong> The AI is very confident in this diagnosis. Consider this as the most likely condition.
+                    </li>
+                    <li>
+                      <strong className="text-yellow-700">Mid Confidence (50-70%):</strong> The AI has reasonable confidence. Consult with an agricultural expert if uncertain.
+                    </li>
+                    <li>
+                      <strong className="text-orange-700">Low Confidence (&lt;50%):</strong> Results are less reliable. Take a clearer image or seek expert advice.
+                    </li>
                   </ul>
+                </div>
+
+                {/* Disclaimer */}
+                <div className="card bg-yellow-50 border border-yellow-300">
+                  <p className="text-sm text-yellow-900">
+                    <strong>Disclaimer:</strong> This AI-based detection is a tool to assist farmers. For critical crop health decisions,
+                    always consult with local agricultural extension officers or experts. Early detection and proper diagnosis are key to
+                    effective disease management.
+                  </p>
                 </div>
 
                 {/* Action Buttons */}
@@ -370,10 +604,10 @@ const DiseaseDetector: React.FC = () => {
                     onClick={handleReset}
                     className="btn-primary flex-1"
                   >
-                    {t('disease.checkAnotherLeaf')}
+                    Check Another Leaf
                   </button>
                   <button className="btn-outline flex-1">
-                    {t('disease.shareResults')}
+                    Share Results
                   </button>
                 </div>
               </div>
@@ -381,15 +615,12 @@ const DiseaseDetector: React.FC = () => {
               <div className="card text-center py-12">
                 <AlertCircle className="w-16 h-16 text-yellow-600 mx-auto mb-4" />
                 <h3 className="text-xl font-bold text-accent-900 mb-2">
-                  {t('disease.noDiseaseTitle')}
+                  No Disease Detected
                 </h3>
                 <p className="text-accent-600 mb-6">
-                  {t('disease.notFound')}
+                  Your plant appears to be healthy! Continue monitoring for early disease signs.
                 </p>
-                <button
-                  onClick={handleReset}
-                  className="btn-primary"
-                >
+                <button onClick={handleReset} className="btn-primary" type="button">
                   Check Another Leaf
                 </button>
               </div>
