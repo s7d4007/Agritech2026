@@ -15,7 +15,12 @@ export const STATES_DISTRICTS: Record<string, string[]> = {
   "odisha": ["Bhubaneswar", "Cuttack", "Rourkela", "Balasore", "Dhenkanal", "Sambalpur", "Koraput", "Sundargarh"],
   "rajasthan": ["Jaipur", "Jodhpur", "Udaipur", "Nagaur", "Hanumangarh", "Jaisalmer", "Barmer", "Bikaner"],
   "assam": ["Guwahati", "Silchar", "Dibrugarh", "Nagaon", "Tinsukia", "Sonitpur", "Kamrup", "Nalbari"],
-  "himachal-pradesh": ["Shimla", "Mandi", "Kangra", "Solan", "Kullu", "Chamba", "Bilaspur", "Kinnaur"]
+  "himachal-pradesh": ["Shimla", "Mandi", "Kangra", "Solan", "Kullu", "Chamba", "Bilaspur", "Kinnaur"],
+  "gujarat": ["Ahmedabad", "Surat", "Vadodara", "Rajkot", "Bhavnagar", "Jamnagar", "Junagadh", "Gandhinagar"],
+  "kerala": ["Thiruvananthapuram", "Kochi", "Kozhikode", "Thrissur", "Alappuzha", "Kollam", "Kannur", "Palakkad"],
+  "jharkhand": ["Ranchi", "Jamshedpur", "Dhanbad", "Bokaro", "Deoghar", "Hazaribagh", "Giridih", "Ramgarh"],
+  "chhattisgarh": ["Raipur", "Bilaspur", "Durg", "Korba", "Jagdalpur", "Rajnandgaon", "Ambikapur", "Mahasamund"],
+  "uttarakhand": ["Dehradun", "Haridwar", "Nainital", "Rudrapur", "Haldwani", "Roorkee", "Kashipur", "Pithoragarh"]
 };
 
 // English names mapping
@@ -35,7 +40,12 @@ export const STATE_NAMES_EN: Record<string, string> = {
   "odisha": "Odisha",
   "rajasthan": "Rajasthan",
   "assam": "Assam",
-  "himachal-pradesh": "Himachal Pradesh"
+  "himachal-pradesh": "Himachal Pradesh",
+  "gujarat": "Gujarat",
+  "kerala": "Kerala",
+  "jharkhand": "Jharkhand",
+  "chhattisgarh": "Chhattisgarh",
+  "uttarakhand": "Uttarakhand"
 };
 
 // Hindi names mapping
@@ -55,7 +65,12 @@ export const STATE_NAMES_HI: Record<string, string> = {
   "odisha": "ओडिशा",
   "rajasthan": "राजस्थान",
   "assam": "असम",
-  "himachal-pradesh": "हिमाचल प्रदेश"
+  "himachal-pradesh": "हिमाचल प्रदेश",
+  "gujarat": "गुजरात",
+  "kerala": "केरल",
+  "jharkhand": "झारखंड",
+  "chhattisgarh": "छत्तीसगढ़",
+  "uttarakhand": "उत्तराखंड"
 };
 
 // Get all states
