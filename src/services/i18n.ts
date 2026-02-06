@@ -4,6 +4,12 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 
 import enTranslations from '../locales/en.json';
 import hiTranslations from '../locales/hi.json';
+import mrTranslations from '../locales/marathi.json';
+import bnTranslations from '../locales/bengali.json';
+import guTranslations from '../locales/gujarati.json';
+import asTranslations from '../locales/assamese.json';
+import orTranslations from '../locales/odia.json';
+import paTranslations from '../locales/punjabi.json';
 
 // Initialize i18next
 i18n
@@ -13,6 +19,12 @@ i18n
     resources: {
       en: { translation: enTranslations },
       hi: { translation: hiTranslations },
+      mr: { translation: mrTranslations },
+      bn: { translation: bnTranslations },
+      gu: { translation: guTranslations },
+      as: { translation: asTranslations },
+      or: { translation: orTranslations },
+      pa: { translation: paTranslations },
     },
     fallbackLng: 'en',
     interpolation: {

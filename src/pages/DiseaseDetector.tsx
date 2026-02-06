@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Camera, Upload, AlertCircle, Info, Loader } from 'lucide-react';
 import { saveDiagnostic } from '../services/db';
@@ -18,15 +18,12 @@ const DiseaseDetector: React.FC = () => {
   const { t } = useTranslation();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [detectedDisease, setDetectedDisease] = useState<any>(null);
-  const [confidence, setConfidence] = useState(0);
+  const [detectionResult, setDetectionResult] = useState<DetectionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [imageValidationError, setImageValidationError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [showStream, setShowStream] = useState(false);
-  const streamRef = useRef<MediaStream | null>(null);
+  // no live stream in this implementation; keep file-based capture
 
   // Constants for image validation
   const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -156,13 +153,18 @@ const DiseaseDetector: React.FC = () => {
     try {
       console.log('Initiating disease detection...');
       const result = await detectPlantDisease(imageData);
+      const resultData = result as unknown as {
+        success?: boolean;
+        data?: { predictions?: unknown[]; isMockDetection?: boolean };
+        retryable?: boolean;
+        error?: string;
+      };
 
-      if (result.success) {
-        // Handle new format with multiple predictions
-        const resultData = result as any;
+      if (resultData.success) {
         if (resultData.data?.predictions) {
+          const preds = resultData.data.predictions as unknown as DetectionResult['predictions'];
           const detectionData: DetectionResult = {
-            predictions: resultData.data.predictions,
+            predictions: preds,
             isMockDetection: resultData.data.isMockDetection || false,
           };
 
@@ -170,7 +172,7 @@ const DiseaseDetector: React.FC = () => {
 
           setDetectionResult(detectionData);
 
-          // Save to IndexedDB
+          // Save to IndexedDB (best-effort)
           try {
             await saveDiagnostic({
               imageData,
@@ -183,18 +185,16 @@ const DiseaseDetector: React.FC = () => {
             console.log('Detection result saved to database');
           } catch (dbError) {
             console.error('Failed to save to database:', dbError);
-            // Don't fail the detection if database save fails
           }
 
-          // Show info about mock detection
           if (detectionData.isMockDetection) {
             setError(
               'Using offline detection. For more accurate results, configure Hugging Face API integration.'
             );
           }
         }
-      } else if ((result as any).retryable) {
-        setError((result as any).error || 'Detection service is loading. Please try again in a moment.');
+      } else if (resultData.retryable) {
+        setError(resultData.error || 'Detection service is loading. Please try again in a moment.');
       } else {
         setError('Unable to detect disease. Please try another image.');
       }
@@ -203,59 +203,6 @@ const DiseaseDetector: React.FC = () => {
       setError('An error occurred during detection. Please try again.');
     } finally {
       setAnalyzing(false);
-    }
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Check file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        setError('File size must be less than 5MB');
-        return;
-      }
-
-      // Check file type
-      if (!file.type.startsWith('image/')) {
-        setError('Please upload an image file');
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const imageData = event.target?.result as string;
-        setSelectedImage(imageData);
-        setDetectedDisease(null);
-        setError(null);
-        simulateDiseaseDetection(imageData);
-      };
-      reader.onerror = () => {
-        setError('Failed to read file');
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setError('File size must be less than 5MB');
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const imageData = event.target?.result as string;
-        setSelectedImage(imageData);
-        setDetectedDisease(null);
-        setError(null);
-        simulateDiseaseDetection(imageData);
-      };
-      reader.onerror = () => {
-        setError('Failed to capture image');
-      };
-      reader.readAsDataURL(file);
     }
   };
 
@@ -380,24 +327,7 @@ const DiseaseDetector: React.FC = () => {
               </div>
             </div>
 
-            {/* Live Camera Modal */}
-            {showStream && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                <div className="bg-white rounded-lg p-4 w-full max-w-3xl mx-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-lg font-bold">{t('disease.takePhoto')}</h3>
-                    <button onClick={stopCameraStream} className="btn-ghost">{t('common.close')}</button>
-                  </div>
-                  <div className="aspect-video bg-black rounded overflow-hidden">
-                    <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
-                  </div>
-                  <div className="mt-4 flex gap-3">
-                    <button onClick={captureFromStream} className="btn-primary flex-1">{t('disease.capture')}</button>
-                    <button onClick={stopCameraStream} className="btn-outline">{t('common.cancel')}</button>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Live camera preview removed: using file / capture input fallback for compatibility */}
 
             {/* Tips Section */}
             <div className="card bg-blue-50 border-l-4 border-blue-500">
@@ -633,3 +563,4 @@ const DiseaseDetector: React.FC = () => {
 };
 
 export default DiseaseDetector;
+

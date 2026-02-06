@@ -211,9 +211,16 @@
     "termsOfService": "सेवा की शर्तें",
     "languages": {
       "en": "English",
-      "hi": "हिंदी (Hindi)"
+      "hi": "हिंदी (Hindi)",
+      "mr": "मराठी",
+      "bn": "बंगाली",
+      "gu": "गुजराती",
+      "as": "असमिया",
+      "or": "ओड़िया",
+      "pa": "पंजाबी"
     }
   },
+  "settings.languageChanged": "भाषा {{name}} में बदल दी गई",
   "common": {
     "loading": "लोड हो रहा है...",
     "error": "एक त्रुटि हुई",

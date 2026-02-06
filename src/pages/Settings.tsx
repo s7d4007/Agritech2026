@@ -123,9 +123,14 @@ const SettingsPage: React.FC = () => {
                 <button
                   key={lang.code}
                   onClick={() => {
+                    const langName = t(`settings.languages.${lang.code}`, {
+                      defaultValue: lang.name,
+                    });
                     i18n.changeLanguage(lang.code);
                     localStorage.setItem('language', lang.code);
-                    setMessage(`Language changed to ${lang.name}`);
+                    setMessage(
+                      t('settings.languageChanged', { name: langName })
+                    );
                     setTimeout(() => setMessage(''), 3000);
                   }}
                   className={`px-4 py-3 rounded-lg font-medium transition-all ${
@@ -134,7 +139,9 @@ const SettingsPage: React.FC = () => {
                       : 'bg-accent-100 text-accent-700 hover:bg-accent-200'
                   }`}
                 >
-                  {lang.name}
+                  {t(`settings.languages.${lang.code}`, {
+                    defaultValue: lang.name,
+                  })}
                 </button>
               ))}
             </div>

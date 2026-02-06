@@ -4,6 +4,16 @@ import { Sprout, TrendingUp, Leaf, Target } from 'lucide-react';
 import { fetchCropRecommendations } from '../services/api';
 import { getAllStates, getDistrictsForState, STATE_NAMES_EN, STATE_NAMES_HI } from '../utils/statesDistricts';
 
+interface Crop {
+  id: string;
+  name: string;
+  description: string;
+  expectedYield: number;
+  profitability: number;
+  sustainability: number;
+  mspPrice: number;
+}
+
 const CropAdvisory: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [state, setState] = useState('');
@@ -202,7 +212,7 @@ const CropAdvisory: React.FC = () => {
                         </h3>
                       </div>
                       <p className="text-3xl font-bold text-primary-700">
-                        {selectedCrop.expectedYield}
+                        {selectedCrop.expectedYield} q/acre
                       </p>
                       <p className="text-sm text-accent-600">
                         {t('cropAdvisory.acresLabel')}
