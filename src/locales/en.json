@@ -31,7 +31,11 @@
     "farmers": "Farmers Reached",
     "profitIncrease": "Potential Profit Increase",
     "priceRealization": "Better Price Realization",
-    "diseaseReduction": "Disease Loss Reduction"
+    "diseaseReduction": "Disease Loss Reduction",
+    "ctaTitle": "Ready to Transform Your Farming?",
+    "ctaDescription": "Download AgriSahayak today and join thousands of Indian farmers earning better.",
+    "ctaGetStarted": "Get Started Now",
+    "ctaCustomizeLanguage": "Customize Language"
   },
   "cropAdvisory": {
     "title": "Smart Crop Advisory",
@@ -144,6 +148,26 @@
     "consultFarmer": "Consult local agricultural officer",
     "checkAnotherLeaf": "Check Another Leaf",
     "shareResults": "Share Results",
+    "selectFromDevice": "Select a photo from your device",
+    "chooseFile": "Choose File",
+    "captureUsingCamera": "Capture a photo using your camera",
+    "openCamera": "Open Camera",
+    "capture": "Capture",
+    "tipsTitle": "Tips for Best Results",
+    "tip1": "Capture the affected leaf clearly",
+    "tip2": "Ensure good lighting for accurate detection",
+    "tip3": "Show the disease symptoms clearly",
+    "tip4": "Works offline - no internet needed",
+    "analyzingDescription": "Using AI to identify disease in your crop...",
+    "noDiseaseTitle": "No Disease Detected",
+    "additionalTips": "Additional Tips",
+    "errorFileSize": "File size must be less than 5MB",
+    "errorImageType": "Please upload an image file",
+    "errorReadFile": "Failed to read file",
+    "errorCaptureImage": "Failed to capture image",
+    "errorCameraNotAvailable": "Camera not available",
+    "errorDetectDisease": "Unable to detect disease. Please try another image.",
+    "errorDetectionFailed": "An error occurred during detection. Please try again.",
     "diseases": {
       "leafSpot": "Leaf Spot",
       "powderyMildew": "Powdery Mildew",
@@ -211,5 +235,33 @@
     "pleaseSelect": "Please select",
     "noResults": "No results found",
     "required": "This field is required"
+  },
+  "footer": {
+    "description": "Empowering Indian farmers with smart agricultural intelligence",
+    "features": "Features",
+    "support": "Support",
+    "privacyPolicy": "Privacy Policy",
+    "termsOfService": "Terms of Service",
+    "contact": "Contact Us",
+    "copyright": "All rights reserved",
+    "madeWith": "Made with ❤️ for Indian Farmers"
+  },
+  "privacy": {
+    "title": "Privacy Policy",
+    "description": "Your privacy matters. We store minimal data locally and never share without consent.",
+    "dataCollectionTitle": "Data Collection",
+    "dataCollection": "We collect image data for disease detection and store it locally on your device for offline use.",
+    "dataUseTitle": "How We Use Data",
+    "dataUse": "Data is used to provide features like disease detection and is stored locally. You can delete it anytime.",
+    "contactTitle": "Contact",
+    "contact": "If you have questions, contact us at support@agrisahayak.example"
+  },
+  "terms": {
+    "title": "Terms of Service",
+    "description": "By using AgriSahayak you agree to the terms described here.",
+    "usageTitle": "Use of Service",
+    "usage": "The app is provided as-is for informational purposes. Use responsibly.",
+    "liabilityTitle": "Liability",
+    "liability": "We are not liable for crop losses; recommendations are advisory."
   }
 }

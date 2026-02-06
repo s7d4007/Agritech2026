@@ -17,10 +17,24 @@ import {
 } from 'lucide-react';
 import { fetchWeather, getLocationCoordinates } from '../services/api';
 
+interface Weather {
+  temperature: number;
+  feelsLike: number;
+  description: string;
+  humidity: number;
+  windSpeed: number;
+  pressure: number;
+  cloudCover: number;
+  offline?: boolean;
+  location?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
 const Home: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [weather, setWeather] = useState<any>(null);
+  const [weather, setWeather] = useState<Weather | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
 
   // Fetch weather on component mount
@@ -309,22 +323,22 @@ const Home: React.FC = () => {
       {/* CTA Section */}
       <section className="py-20 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="section-title">Ready to Transform Your Farming?</h2>
+          <h2 className="section-title">{t('home.ctaTitle')}</h2>
           <p className="section-subtitle mb-8">
-            Download AgriSahayak today and join thousands of Indian farmers earning better.
+            {t('home.ctaDescription')}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
               onClick={() => navigate('/crop-advisory')}
               className="btn-primary"
             >
-              Get Started Now
+              {t('home.ctaGetStarted')}
             </button>
             <button
               onClick={() => navigate('/settings')}
               className="btn-secondary"
             >
-              Customize Language
+              {t('home.ctaCustomizeLanguage')}
             </button>
           </div>
         </div>

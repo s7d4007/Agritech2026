@@ -47,9 +47,9 @@ api.interceptors.response.use(
 );
 
 // Crop recommendations API
-export const fetchCropRecommendations = async (_district: string, _season: string, _soilType: string) => {
+export const fetchCropRecommendations = async (district: string, season: string, soilType: string) => {
   try {
-    // In production, call real API
+    // In production, call real API with district, season, and soilType parameters
     // For now, return mock data
     return {
       success: true,

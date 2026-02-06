@@ -10,6 +10,8 @@ import PriceCalculator from './pages/PriceCalculator';
 import DiseaseDetector from './pages/DiseaseDetector';
 import NewsAlerts from './pages/NewsAlerts';
 import SettingsPage from './pages/Settings';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
 import { initDB } from './services/db';
 
 const App: React.FC = () => {
@@ -48,6 +50,8 @@ const App: React.FC = () => {
             <Route path="/disease-detector" element={<DiseaseDetector />} />
             <Route path="/news" element={<NewsAlerts />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsOfService />} />
           </Routes>
         </Layout>
       </Router>

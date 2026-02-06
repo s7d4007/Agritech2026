@@ -4,11 +4,19 @@ import { TrendingUp, TrendingDown, DollarSign, Target } from 'lucide-react';
 import { MARKET_PRICES } from '../utils/constants';
 import { fetchMarketPrices } from '../services/api';
 
+interface Price {
+  commodity: string;
+  mspPrice: number;
+  marketPrice: number;
+  trend: 'up' | 'down' | 'stable';
+  lastUpdated?: string;
+}
+
 const PriceDashboard: React.FC = () => {
   const { t } = useTranslation();
-  const [prices, setPrices] = useState<any[]>([]);
+  const [prices, setPrices] = useState<Price[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCommodity, setSelectedCommodity] = useState<any>(null);
+  const [selectedCommodity, setSelectedCommodity] = useState<Price | null>(null);
 
   useEffect(() => {
     loadPrices();
@@ -19,7 +27,7 @@ const PriceDashboard: React.FC = () => {
     try {
       const result = await fetchMarketPrices();
       if (result.success) {
-        setPrices(result.data || MARKET_PRICES);
+        setPrices((result.data as Price[]) || MARKET_PRICES);
       }
     } finally {
       setLoading(false);

@@ -4,6 +4,18 @@ import { Sprout, TrendingUp, Leaf, Target } from 'lucide-react';
 import { fetchCropRecommendations } from '../services/api';
 import { getAllStates, getDistrictsForState, STATE_NAMES_EN, STATE_NAMES_HI } from '../utils/statesDistricts';
 
+type Crop = {
+  id: string;
+  name: string;
+  season: string;
+  soilType: string;
+  expectedYield: string;
+  profitability: string;
+  sustainability: string;
+  mspPrice: string;
+  description?: string;
+};
+
 const CropAdvisory: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [state, setState] = useState('');

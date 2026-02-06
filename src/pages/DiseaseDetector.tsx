@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Camera, Upload, AlertCircle, CheckCircle, Info } from 'lucide-react';
 import { saveDiagnostic } from '../services/db';
@@ -8,11 +8,14 @@ const DiseaseDetector: React.FC = () => {
   const { t } = useTranslation();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [detectedDisease, setDetectedDisease] = useState<any>(null);
+  const [detectedDisease, setDetectedDisease] = useState<{ name: string; treatment: string; prevention: string } | null>(null);
   const [confidence, setConfidence] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [showStream, setShowStream] = useState(false);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const simulateDiseaseDetection = async (imageData: string) => {
     setAnalyzing(true);
@@ -32,11 +35,11 @@ const DiseaseDetector: React.FC = () => {
           result: { disease: result.data.disease, confidence: result.data.confidence }
         });
       } else {
-        setError('Unable to detect disease. Please try another image.');
+        setError(t('disease.errorDetectDisease'));
       }
     } catch (err) {
       console.error('Error during detection:', err);
-      setError('An error occurred during detection. Please try again.');
+      setError(t('disease.errorDetectionFailed'));
     } finally {
       setAnalyzing(false);
     }
@@ -47,13 +50,13 @@ const DiseaseDetector: React.FC = () => {
     if (file) {
       // Check file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        setError('File size must be less than 5MB');
+        setError(t('disease.errorFileSize'));
         return;
       }
 
       // Check file type
       if (!file.type.startsWith('image/')) {
-        setError('Please upload an image file');
+        setError(t('disease.errorImageType'));
         return;
       }
 
@@ -66,7 +69,7 @@ const DiseaseDetector: React.FC = () => {
         simulateDiseaseDetection(imageData);
       };
       reader.onerror = () => {
-        setError('Failed to read file');
+        setError(t('disease.errorReadFile'));
       };
       reader.readAsDataURL(file);
     }
@@ -76,7 +79,7 @@ const DiseaseDetector: React.FC = () => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        setError('File size must be less than 5MB');
+        setError(t('disease.errorFileSize'));
         return;
       }
 
@@ -89,11 +92,64 @@ const DiseaseDetector: React.FC = () => {
         simulateDiseaseDetection(imageData);
       };
       reader.onerror = () => {
-        setError('Failed to capture image');
+        setError(t('disease.errorCaptureImage'));
       };
       reader.readAsDataURL(file);
     }
   };
+
+  // Start live camera stream (modal)
+  const startCameraStream = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        // Mute to allow autoplay in browsers
+        if (videoRef.current) { videoRef.current.muted = true; }
+        if (videoRef.current) { void videoRef.current.play().catch(() => { /* ignore */ }); }
+      }
+      setShowStream(true);
+    } catch (err) {
+      console.error('Camera access denied or not available', err);
+      setError(t('disease.errorCameraNotAvailable'));
+    }
+  };
+
+  const stopCameraStream = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      if (videoRef.current) { videoRef.current.pause(); }
+      videoRef.current.srcObject = null;
+    }
+    setShowStream(false);
+  };
+
+  const captureFromStream = async () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg');
+    setSelectedImage(dataUrl);
+    setDetectedDisease(null);
+    setError(null);
+    stopCameraStream();
+    await simulateDiseaseDetection(dataUrl);
+  };
+
+  useEffect(() => {
+    return () => {
+      stopCameraStream();
+    };
+  }, []);
 
   const handleReset = () => {
     setSelectedImage(null);
@@ -124,7 +180,7 @@ const DiseaseDetector: React.FC = () => {
           <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-800 rounded-lg flex items-start gap-3">
             <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold">Error</p>
+              <p className="font-semibold">{t('common.error')}</p>
               <p className="text-sm">{error}</p>
             </div>
           </div>
@@ -145,10 +201,10 @@ const DiseaseDetector: React.FC = () => {
                     {t('disease.uploadPhoto')}
                   </h3>
                   <p className="text-accent-600 mb-4">
-                    Select a photo from your device
+                    {t('disease.selectFromDevice')}
                   </p>
                   <button className="btn-primary w-full">
-                    Choose File
+                    {t('disease.chooseFile')}
                   </button>
                 </div>
                 <input
@@ -161,8 +217,7 @@ const DiseaseDetector: React.FC = () => {
               </div>
 
               {/* Camera Option */}
-              <div className="card cursor-pointer hover:border-primary-400 transition-all"
-                onClick={() => cameraInputRef.current?.click()}>
+              <div className="card cursor-pointer hover:border-primary-400 transition-all">
                 <div className="text-center">
                   <div className="bg-secondary-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
                     <Camera className="w-10 h-10 text-secondary-600" />
@@ -171,10 +226,10 @@ const DiseaseDetector: React.FC = () => {
                     {t('disease.takePhoto')}
                   </h3>
                   <p className="text-accent-600 mb-4">
-                    Capture a photo using your camera
+                    {t('disease.captureUsingCamera')}
                   </p>
-                  <button className="btn-secondary w-full">
-                    Open Camera
+                  <button className="btn-secondary w-full" onClick={(e) => { e.stopPropagation(); startCameraStream(); }}>
+                    {t('disease.openCamera')}
                   </button>
                 </div>
                 <input
@@ -188,17 +243,36 @@ const DiseaseDetector: React.FC = () => {
               </div>
             </div>
 
+            {/* Live Camera Modal */}
+            {showStream && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                <div className="bg-white rounded-lg p-4 w-full max-w-3xl mx-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-lg font-bold">{t('disease.takePhoto')}</h3>
+                    <button onClick={stopCameraStream} className="btn-ghost">{t('common.close')}</button>
+                  </div>
+                  <div className="aspect-video bg-black rounded overflow-hidden">
+                    <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
+                  </div>
+                  <div className="mt-4 flex gap-3">
+                    <button onClick={captureFromStream} className="btn-primary flex-1">{t('disease.capture')}</button>
+                    <button onClick={stopCameraStream} className="btn-outline">{t('common.cancel')}</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Tips Section */}
             <div className="card bg-blue-50 border-l-4 border-blue-500">
               <h3 className="font-bold text-lg text-accent-900 mb-4 flex items-center gap-2">
                 <Info className="w-5 h-5 text-blue-600" />
-                Tips for Best Results
+                {t('disease.tipsTitle')}
               </h3>
               <ul className="space-y-2 text-accent-700">
-                <li>✓ Capture the affected leaf clearly</li>
-                <li>✓ Ensure good lighting for accurate detection</li>
-                <li>✓ Show the disease symptoms clearly</li>
-                <li>✓ Works offline - no internet needed</li>
+                <li>✓ {t('disease.tip1')}</li>
+                <li>✓ {t('disease.tip2')}</li>
+                <li>✓ {t('disease.tip3')}</li>
+                <li>✓ {t('disease.tip4')}</li>
               </ul>
             </div>
           </div>
@@ -216,7 +290,7 @@ const DiseaseDetector: React.FC = () => {
                 onClick={handleReset}
                 className="btn-outline w-full"
               >
-                Take Another Photo
+                {t('disease.checkAnotherLeaf')}
               </button>
             </div>
 
@@ -229,9 +303,7 @@ const DiseaseDetector: React.FC = () => {
                 <h3 className="text-xl font-bold text-accent-900 mb-2">
                   {t('disease.analyzing')}
                 </h3>
-                <p className="text-accent-600">
-                  Using AI to identify disease in your crop...
-                </p>
+                <p className="text-accent-600">{t('disease.analyzingDescription')}</p>
               </div>
             ) : detectedDisease ? (
               <div className="space-y-6">
@@ -282,7 +354,7 @@ const DiseaseDetector: React.FC = () => {
                 {/* Additional Tips */}
                 <div className="card bg-green-50">
                   <h3 className="font-bold text-lg text-accent-900 mb-4">
-                    Additional Tips
+                    {t('disease.additionalTips')}
                   </h3>
                   <ul className="space-y-2 text-accent-700">
                     <li>✓ {t('disease.useOrganic')}</li>
@@ -298,10 +370,10 @@ const DiseaseDetector: React.FC = () => {
                     onClick={handleReset}
                     className="btn-primary flex-1"
                   >
-                    Check Another Leaf
+                    {t('disease.checkAnotherLeaf')}
                   </button>
                   <button className="btn-outline flex-1">
-                    Share Results
+                    {t('disease.shareResults')}
                   </button>
                 </div>
               </div>
@@ -309,7 +381,7 @@ const DiseaseDetector: React.FC = () => {
               <div className="card text-center py-12">
                 <AlertCircle className="w-16 h-16 text-yellow-600 mx-auto mb-4" />
                 <h3 className="text-xl font-bold text-accent-900 mb-2">
-                  No Disease Detected
+                  {t('disease.noDiseaseTitle')}
                 </h3>
                 <p className="text-accent-600 mb-6">
                   {t('disease.notFound')}

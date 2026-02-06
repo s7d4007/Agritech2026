@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Settings, Trash2, Download, Info } from 'lucide-react';
-import { clearDatabase, getDBSize } from '../services/db';
+import { clearDatabase, getDBSize, getAllDiagnostics, getAllPrices } from '../services/db';
 import { LANGUAGES, APP_VERSION, APP_NAME } from '../utils/constants';
 
 const SettingsPage: React.FC = () => {
@@ -34,15 +34,49 @@ const SettingsPage: React.FC = () => {
     ) {
       setLoading(true);
       try {
+        // Clear IndexedDB stores
         await clearDatabase();
+
+        // Clear all service worker caches
+        if ('caches' in window) {
+          const cacheNames = await caches.keys();
+          await Promise.all(cacheNames.map((name) => caches.delete(name)));
+        }
+
         setMessage('Cache cleared successfully!');
         setTimeout(() => setMessage(''), 3000);
         await updateDBSize();
-      } catch {
+      } catch (err) {
+        console.error('Error clearing cache:', err);
         setMessage('Failed to clear cache');
       } finally {
         setLoading(false);
       }
+    }
+  };
+
+  const handleDownloadData = async () => {
+    try {
+      setLoading(true);
+      const diagnostics = await getAllDiagnostics();
+      const prices = await getAllPrices();
+      const exportObj = { diagnostics, prices, exportedAt: new Date().toISOString() };
+      const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `agrisahayak-data-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setMessage('Data downloaded');
+      setTimeout(() => setMessage(''), 3000);
+    } catch (err) {
+      console.error('Download failed', err);
+      setMessage('Failed to download data');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -145,7 +179,7 @@ const SettingsPage: React.FC = () => {
               </div>
 
               {/* Download Data Button */}
-              <button className="btn-secondary w-full flex items-center justify-center gap-2">
+              <button onClick={handleDownloadData} className="btn-secondary w-full flex items-center justify-center gap-2">
                 <Download className="w-5 h-5" />
                 {t('settings.downloadData')}
               </button>
@@ -233,10 +267,10 @@ const SettingsPage: React.FC = () => {
           {/* Links */}
           <div className="card">
             <div className="space-y-3">
-              <a href="#" className="block text-primary-600 font-medium hover:text-primary-700">
+              <a href="/privacy" className="block text-primary-600 font-medium hover:text-primary-700">
                 → {t('settings.privacyPolicy')}
               </a>
-              <a href="#" className="block text-primary-600 font-medium hover:text-primary-700">
+              <a href="/terms" className="block text-primary-600 font-medium hover:text-primary-700">
                 → {t('settings.termsOfService')}
               </a>
               <a href="mailto:support@agrisahayak.com" className="block text-primary-600 font-medium hover:text-primary-700">

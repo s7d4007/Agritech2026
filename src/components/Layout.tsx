@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Menu, X, Leaf } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -33,8 +33,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <Link to="/" className="flex items-center gap-2 group">
-              <div className="bg-gradient-to-br from-primary-600 to-secondary-600 p-2 rounded-lg">
-                <Leaf className="w-6 h-6 text-white" />
+              <div className="p-0">
+                <img src="/logo.png" alt="AgriSahayak" className="w-10 h-10 rounded-full object-cover" />
               </div>
               <div className="hidden sm:block">
                 <h1 className="text-xl font-bold text-primary-700">AgriSahayak</h1>
@@ -159,44 +159,34 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* Footer */}
       <footer className="bg-secondary-800 text-white mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <Leaf className="w-6 h-6" />
+                <img src="/logo.png" alt="AgriSahayak" className="w-8 h-8 rounded-full" />
                 <h3 className="font-bold text-lg">AgriSahayak</h3>
               </div>
-              <p className="text-sm text-gray-300">Empowering Indian farmers with smart agricultural intelligence.</p>
+              <p className="text-sm text-gray-300">{t('footer.description')}</p>
             </div>
             <div>
-              <h4 className="font-semibold mb-4">Features</h4>
+              <h4 className="font-semibold mb-4">{t('footer.features')}</h4>
               <ul className="space-y-2 text-sm text-gray-300">
-                <li><a href="#" className="hover:text-primary-400">Crop Advisory</a></li>
-                <li><a href="#" className="hover:text-primary-400">Price Info</a></li>
-                <li><a href="#" className="hover:text-primary-400">Disease Detection</a></li>
-                <li><a href="#" className="hover:text-primary-400">News & Alerts</a></li>
+                <li><a href="/crop-advisory" className="hover:text-primary-400">{t('nav.cropAdvisory')}</a></li>
+                <li><a href="/prices" className="hover:text-primary-400">{t('nav.priceInfo')}</a></li>
+                <li><a href="/disease-detector" className="hover:text-primary-400">{t('nav.diseaseDetector')}</a></li>
+                <li><a href="/news" className="hover:text-primary-400">{t('nav.news')}</a></li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold mb-4">Support</h4>
+              <h4 className="font-semibold mb-4">{t('footer.support')}</h4>
               <ul className="space-y-2 text-sm text-gray-300">
-                <li><a href="#" className="hover:text-primary-400">About Us</a></li>
-                <li><a href="#" className="hover:text-primary-400">Contact</a></li>
-                <li><a href="#" className="hover:text-primary-400">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-primary-400">Terms of Service</a></li>
+                <li><a href="/privacy" className="hover:text-primary-400">{t('footer.privacyPolicy')}</a></li>
+                <li><a href="/terms" className="hover:text-primary-400">{t('footer.termsOfService')}</a></li>
+                <li><a href="mailto:support@agrisahayak.com" className="hover:text-primary-400">{t('footer.contact')}</a></li>
               </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Connect</h4>
-              <p className="text-sm text-gray-300 mb-2">Follow us on social media for updates and tips.</p>
-              <div className="flex gap-4">
-                <a href="#" className="text-primary-400 hover:text-primary-300">Facebook</a>
-                <a href="#" className="text-primary-400 hover:text-primary-300">Twitter</a>
-                <a href="#" className="text-primary-400 hover:text-primary-300">Instagram</a>
-              </div>
             </div>
           </div>
           <div className="border-t border-secondary-700 pt-8 text-center text-sm text-gray-400">
-            <p>&copy; {new Date().getFullYear()} AgriSahayak. All rights reserved. | Made with ❤️ for Indian Farmers</p>
+            <p>&copy; {new Date().getFullYear()} AgriSahayak. {t('footer.copyright')} | {t('footer.madeWith')}</p>
           </div>
         </div>
       </footer>
