@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { MARKET_PRICES, NEWS_ITEMS, CROPS, DISEASES } from '../utils/constants';
+import { MARKET_PRICES, NEWS_ITEMS, CROPS } from '../utils/constants';
+import { getDiseaseInfo } from '../utils/diseaseMapping';
 
 // Create axios instance with base config
 const api = axios.create({
@@ -14,11 +15,14 @@ const weatherAPI = axios.create({
   timeout: 10000,
 });
 
-// Plant.id Disease Detection API
-const PLANT_ID_KEY = import.meta.env.VITE_PLANT_ID_KEY || '';
-const plantIdAPI = axios.create({
-  baseURL: 'https://api.plant.id',
-  timeout: 30000,
+// Hugging Face Inference API
+const HF_API_KEY = import.meta.env.VITE_HF_API_KEY || '';
+const HF_MODEL = 'keremberke/plant-disease-classification';
+const HF_API_URL = `https://api-inference.huggingface.co/models/${HF_MODEL}`;
+
+const huggingFaceAPI = axios.create({
+  baseURL: HF_API_URL,
+  timeout: 60000, // 60 seconds for model inference
 });
 
 // Request interceptor
@@ -187,79 +191,171 @@ export const getLocationCoordinates = (): Promise<{ lat: number; lon: number }> 
   });
 };
 
-// Disease Detection API using Plant.id
+// Disease Detection API using Hugging Face Inference
 export const detectPlantDisease = async (imageBase64: string) => {
   try {
-    // If Plant.id API key is available, use it
-    if (PLANT_ID_KEY) {
-      try {
-        const response = await plantIdAPI.post('/v3/identification', {
-          images: [imageBase64],
-          similar_images: false,
-        }, {
-          headers: {
-            'Api-Key': PLANT_ID_KEY,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (response.data?.suggestions && response.data.suggestions.length > 0) {
-          const suggestion = response.data.suggestions[0];
-          
-          // Match with our disease database
-          const matchedDisease = DISEASES.find(d =>
-            suggestion.plant_name?.toLowerCase().includes(d.name.toLowerCase()) ||
-            suggestion.plant_details?.diseases?.some((dis: any) =>
-              dis.name?.toLowerCase().includes(d.name.toLowerCase())
-            )
-          );
-
-          return {
-            success: true,
-            data: {
-              disease: matchedDisease || {
-                id: 'unknown',
-                name: suggestion.plant_name || 'Unknown Disease',
-                treatment: 'Please consult a local agricultural expert',
-                prevention: 'Monitor your crop regularly',
-              },
-              confidence: Math.round((suggestion.probability || 0.5) * 100),
-            },
-          };
-        }
-      } catch (apiError) {
-        console.log('Plant.id API error, using fallback detection');
-      }
+    // Validate image input
+    if (!imageBase64 || !imageBase64.startsWith('data:image/')) {
+      return {
+        success: false,
+        error: 'Invalid image format. Please use a valid image file.',
+      };
     }
 
-    // Fallback: Use intelligent mock detection based on image analysis
-    return performMockDiseaseDetection();
-  } catch (error) {
-    console.error('Error detecting plant disease:', error);
+    // Strip data URL prefix to get raw base64
+    const base64Data = imageBase64.split(',')[1];
+    if (!base64Data) {
+      return {
+        success: false,
+        error: 'Failed to process image. Please try again.',
+      };
+    }
+
+    // Check if HF API key is available
+    if (!HF_API_KEY) {
+      console.warn('Hugging Face API key not configured. Using fallback detection.');
+      return performMockDiseaseDetection();
+    }
+
+    // Convert base64 to blob data for Hugging Face API
+    const binaryString = atob(base64Data);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    const imageBlob = new Blob([bytes], { type: 'image/jpeg' });
+
+    console.log('Sending image to Hugging Face API for disease detection...');
+
+    // Call Hugging Face Inference API
+    const response = await huggingFaceAPI.post('/', imageBlob, {
+      headers: {
+        'Authorization': `Bearer ${HF_API_KEY}`,
+        'Content-Type': 'application/octet-stream',
+      },
+    });
+
+    console.log('Hugging Face API Response:', response.data);
+
+    // Parse response from Hugging Face
+    // The API returns an array of predictions with labels and scores
+    if (!Array.isArray(response.data) || response.data.length === 0) {
+      console.warn('No predictions from Hugging Face API');
+      return performMockDiseaseDetection();
+    }
+
+    // Get top 3 predictions
+    const topPredictions = response.data.slice(0, 3).map((prediction: any) => {
+      const label = prediction.label || prediction.name || 'unknown';
+      const confidence = Math.round((prediction.score || 0) * 100);
+      const diseaseInfo = getDiseaseInfo(label);
+      
+      return {
+        disease: diseaseInfo,
+        confidence: confidence,
+        rank: getConfidenceRank(confidence)
+      };
+    });
+
+    // Sort predictions by confidence in descending order
+    const sortedPredictions = topPredictions.sort((a, b) => b.confidence - a.confidence);
+
+    console.log('Top 3 diseases detected:', sortedPredictions.map(p => `${p.disease.name}: ${p.confidence}%`).join(', '));
+
     return {
-      success: false,
-      error: 'Failed to detect disease',
+      success: true,
+      data: {
+        predictions: sortedPredictions,
+        isMockDetection: false,
+      },
     };
+  } catch (error: any) {
+    console.error('Error calling Hugging Face API:', error);
+    
+    // Check if error is due to model loading
+    if (error.response?.status === 503) {
+      console.log('Model is loading, please try again in a moment.');
+      return {
+        success: false,
+        error: 'AI Model is loading. Please try again in a few seconds.',
+        retryable: true,
+      };
+    }
+
+    // Check for authentication error
+    if (error.response?.status === 401) {
+      console.error('Invalid Hugging Face API key');
+      return {
+        success: false,
+        error: 'Authentication failed. Please check API configuration.',
+      };
+    }
+
+    // Fallback to mock detection on other errors
+    console.log('Falling back to mock detection due to API error');
+    return performMockDiseaseDetection();
   }
 };
 
-// Mock disease detection with more intelligent results
+/**
+ * Get confidence rank based on confidence score
+ */
+const getConfidenceRank = (confidence: number): 'High' | 'Mid' | 'Low' => {
+  if (confidence >= 70) return 'High';
+  if (confidence >= 50) return 'Mid';
+  return 'Low';
+};
+
+// Mock disease detection with intelligent results (fallback)
 const performMockDiseaseDetection = () => {
-  // Simulate analyzing image characteristics
-  // In a real scenario, you'd use TensorFlow.js for client-side detection
+  // Fallback detection when API is unavailable
+  // Simulates analyzing image characteristics
+  // In production, ensure Hugging Face API key is configured
   
-  const diseaseList = DISEASES;
-  const randomIndex = Math.floor(Math.random() * diseaseList.length);
-  const detected = diseaseList[randomIndex];
+  const diseaseList = [
+    'apple___scab',
+    'leaf_spot',
+    'powdery_mildew',
+    'rust_disease',
+    'blight_disease',
+    'mosaic_virus',
+    'anthracnose',
+    'healthy'
+  ];
   
-  // Generate confidence between 65-95%
-  const confidence = Math.floor(Math.random() * (95 - 65 + 1)) + 65;
+  // Generate 3 random diseases with decreasing confidence
+  const predictions = [];
+  const usedIndices = new Set<number>();
+  
+  for (let i = 0; i < 3; i++) {
+    let randomIndex;
+    do {
+      randomIndex = Math.floor(Math.random() * diseaseList.length);
+    } while (usedIndices.has(randomIndex) && usedIndices.size < diseaseList.length);
+    
+    usedIndices.add(randomIndex);
+    const selectedLabel = diseaseList[randomIndex];
+    const diseaseInfo = getDiseaseInfo(selectedLabel);
+    
+    // Generate confidence between 95-50% with decreasing scores
+    const baseConfidence = 95 - (i * 25);
+    const confidence = Math.max(40, baseConfidence + Math.floor(Math.random() * 10) - 5);
+    const rank = getConfidenceRank(confidence);
+
+    predictions.push({
+      disease: diseaseInfo,
+      confidence,
+      rank
+    });
+  }
+
+  console.log(`Mock detection with 3 options: ${predictions.map(p => `${p.disease.name} (${p.confidence}%)`).join(', ')}`);
 
   return {
     success: true,
     data: {
-      disease: detected,
-      confidence,
+      predictions,
+      isMockDetection: true,
     },
   };
 };
