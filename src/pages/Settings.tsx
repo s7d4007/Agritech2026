@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Settings, Trash2, Download, Info } from 'lucide-react';
 import { clearDatabase, getDBSize, getAllDiagnostics, getAllPrices } from '../services/db';
+import { saveFeedback } from '../services/feedbackstore';
 import { LANGUAGES, APP_VERSION, APP_NAME } from '../utils/constants';
 
 const SettingsPage: React.FC = () => {
@@ -9,6 +10,8 @@ const SettingsPage: React.FC = () => {
   const [dbSize, setDBSize] = useState({ usage: 0, quota: 0 });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackSaving, setFeedbackSaving] = useState(false);
 
   useEffect(() => {
     updateDBSize();
@@ -86,6 +89,40 @@ const SettingsPage: React.FC = () => {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  const handleSubmitFeedback = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!feedbackText.trim()) return;
+
+    setFeedbackSaving(true);
+    try {
+      await saveFeedback({
+        id: crypto.randomUUID(),
+        message: feedbackText.trim(),
+        language: i18n.language,
+        createdAt: new Date().toISOString(),
+        synced: false,
+      });
+
+      setFeedbackText('');
+      setMessage(
+        t('feedback.savedOffline', {
+          defaultValue: 'Feedback saved offline.',
+        })
+      );
+      setTimeout(() => setMessage(''), 3000);
+    } catch (err) {
+      console.error('Feedback save failed', err);
+      setMessage(
+        t('feedback.saveFailed', {
+          defaultValue: 'Failed to save feedback.',
+        })
+      );
+      setTimeout(() => setMessage(''), 3000);
+    } finally {
+      setFeedbackSaving(false);
+    }
   };
 
   return (
@@ -254,20 +291,37 @@ const SettingsPage: React.FC = () => {
           {/* Feedback Section */}
           <div className="card border-2 border-primary-300">
             <h2 className="text-2xl font-bold text-accent-900 mb-6">
-              {t('settings.feedback')}
+              {t('feedback.title', {
+                defaultValue: t('settings.feedback', { defaultValue: 'Feedback' }),
+              })}
             </h2>
 
-            <textarea
-              placeholder="Tell us how we can improve AgriSahayak..."
-              className="input-field mb-4 h-32"
-            />
+            <form onSubmit={handleSubmitFeedback}>
+              <textarea
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                placeholder={t('feedback.placeholder', {
+                  defaultValue: 'Tell us how we can improve AgriSahayak...',
+                })}
+                className="input-field mb-4 h-32"
+              />
 
-            <button className="btn-primary w-full">
-              Submit Feedback
-            </button>
+              <button
+                type="submit"
+                className="btn-primary w-full"
+                disabled={feedbackSaving || !feedbackText.trim()}
+              >
+                {feedbackSaving
+                  ? t('feedback.saving', { defaultValue: 'Saving...' })
+                  : t('feedback.submit', { defaultValue: 'Submit Feedback' })}
+              </button>
+            </form>
 
             <p className="text-sm text-accent-600 mt-4">
-              Your feedback helps us continue to improve AgriSahayak and serve farmers better.
+              {t('feedback.note', {
+                defaultValue:
+                  'Your feedback helps us continue to improve AgriSahayak and serve farmers better.',
+              })}
             </p>
           </div>
 
